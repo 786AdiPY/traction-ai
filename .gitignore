@@ -1,0 +1,5 @@
+fe/node_modules/
+fe/dist/
+*.log
+.env
+.env.local
