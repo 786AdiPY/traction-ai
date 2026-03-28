@@ -1,7 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import Analysis from "./components/Analysis.jsx";
+import { appStyles as S } from "./App.styles.js";
 import { MODULES, SECTIONS, getTasks, getSysPrompt } from "./constants/modules.js";
 import { claudeAnalyze, runScrapes } from "./lib/api.js";
+import OpinionAIView from "./components/opinionai/OpinionAIView.jsx";
+import CompeteMapView from "./components/competeMap/CompeteMapView.jsx";
+import HireSignalView from "./components/hireSignal/HireSignalView.jsx";
+import InvestorRadarView from "./components/investorRadar/InvestorRadarView.jsx";
+import RegLensView from "./components/regLens/RegLensView.jsx";
+import PriceLabView from "./components/priceLab/PriceLabView.jsx";
+import ChurnSenseView from "./components/churnSense/ChurnSenseView.jsx";
+
+const INTEL_VIEWS = {
+  opinion: OpinionAIView,
+  compete: CompeteMapView,
+  hire: HireSignalView,
+  investor: InvestorRadarView,
+  reg: RegLensView,
+  price: PriceLabView,
+  churn: ChurnSenseView,
+};
 
 const ANTHROPIC_STORAGE = "traction_anthropic_key";
 
@@ -33,6 +50,22 @@ export default function App() {
   const [hist, setHist] = useState({});
   const ref = useRef(null);
   const mod = MODULES.find((m) => m.id === tab);
+  const IntelView = INTEL_VIEWS[tab];
+  const intelProps = {
+    profile,
+    go,
+    query,
+    setQuery,
+    run,
+    loading,
+    phase,
+    analysis,
+    raw,
+    showRaw,
+    setShowRaw,
+    hist,
+    analysisRef: ref,
+  };
 
   function go(id) {
     setTab(id);
@@ -132,7 +165,6 @@ export default function App() {
   if (!launched)
     return (
       <div style={S.root}>
-        <style>{CSS}</style>
         <div style={S.keyOv}>
           <div style={S.onboard}>
             <div style={{ fontSize: 10, letterSpacing: 4, color: "var(--t3)", textTransform: "uppercase", marginBottom: 20 }}>Welcome</div>
@@ -185,7 +217,6 @@ export default function App() {
 
   return (
     <div style={S.root}>
-      <style>{CSS}</style>
       <nav style={{ ...S.side, width: collapsed ? 56 : 224 }}>
         <div style={S.sHead} onClick={() => setCollapsed(!collapsed)}>
           <div style={S.logo}>T</div>
@@ -380,101 +411,7 @@ export default function App() {
           </div>
         )}
 
-        {mod && mod.section !== "home" && mod.section !== "sys" && (
-          <div style={{ animation: "fadeUp .3s ease" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 10,
-                  background: mod.color + "18",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 20,
-                  color: mod.color,
-                }}
-              >
-                {mod.icon}
-              </div>
-              <div>
-                <h1 style={{ fontFamily: "var(--fd)", fontSize: 22, fontWeight: 800, margin: 0, color: "var(--t1)", letterSpacing: -0.5 }}>{mod.name}</h1>
-                <p style={{ fontSize: 12, color: "var(--t3)", margin: 0 }}>{mod.desc}</p>
-              </div>
-            </div>
-
-            {!profile ? (
-              <div style={{ ...S.card, borderLeft: `3px solid ${mod.color}` }}>
-                <p style={{ fontSize: 13, color: "var(--t2)", margin: 0 }}>Set up your profile first.</p>
-                <button style={{ ...S.btn, marginTop: 12, fontSize: 12 }} onClick={() => go("dashboard")}>
-                  Dashboard →
-                </button>
-              </div>
-            ) : (
-              <>
-                <div style={S.srchW}>
-                  <span style={{ color: "var(--t3)", fontSize: 14 }}>⌕</span>
-                  <input style={S.srchI} placeholder={`Ask ${mod.name}...`} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !loading && run()} />
-                  <button style={{ ...S.runB, background: mod.color, opacity: loading ? 0.6 : 1 }} disabled={loading} onClick={run}>
-                    {loading ? <span className="spin">⟳</span> : "→"}
-                  </button>
-                </div>
-
-                {loading && (
-                  <div style={S.ldW}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className="spin" style={{ color: mod.color, fontSize: 14 }}>
-                        ⟳
-                      </span>
-                      <span style={{ fontSize: 12, color: "var(--t3)" }}>{phase}</span>
-                    </div>
-                    <div style={S.pTrk}>
-                      <div style={{ ...S.pBar, background: mod.color }} />
-                    </div>
-                  </div>
-                )}
-
-                {analysis && (
-                  <div ref={ref} style={{ animation: "fadeUp .35s ease" }}>
-                    <div style={{ ...S.card, borderTop: `2px solid ${mod.color}` }}>
-                      <div style={{ fontSize: 10, letterSpacing: 2, color: mod.color, textTransform: "uppercase", fontWeight: 700, marginBottom: 14 }}>Analysis</div>
-                      <Analysis text={analysis} color={mod.color} />
-                    </div>
-                    {raw && !raw[0]?.note && (
-                      <div style={{ marginTop: 8 }}>
-                        <button style={S.togB} onClick={() => setShowRaw(!showRaw)}>
-                          {showRaw ? "Hide" : "Show"} raw data ({raw.length} sources)
-                        </button>
-                        {showRaw && <pre style={S.rawP}>{JSON.stringify(raw, null, 2)}</pre>}
-                      </div>
-                    )}
-                    {raw?.[0]?.note && (
-                      <div style={{ marginTop: 8, padding: "8px 14px", borderRadius: 8, background: "rgba(251,191,36,.08)", fontSize: 11, color: "#fbbf24" }}>
-                        ⚠ {raw[0].note}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {hist[mod.id]?.length > 0 && !loading && !analysis && (
-                  <div style={{ marginTop: 20 }}>
-                    <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--t3)", textTransform: "uppercase", marginBottom: 10 }}>Recent</div>
-                    {hist[mod.id]
-                      .slice(-5)
-                      .reverse()
-                      .map((h, i) => (
-                        <div key={i} style={S.hItem} onClick={() => setQuery(h.q)}>
-                          <span style={{ fontSize: 12, color: "var(--t2)" }}>{h.q}</span>
-                          <span style={{ fontSize: 10, color: "var(--t3)" }}>{h.t}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {IntelView && <IntelView {...intelProps} />}
 
         <div style={S.ft}>
           Powered by <strong>TinyFish</strong> × <strong>Claude API</strong>
@@ -484,55 +421,3 @@ export default function App() {
   );
 }
 
-const S = {
-  root: { display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg)", fontFamily: "var(--fb)", color: "var(--t1)" },
-  side: { height: "100vh", background: "var(--s1)", borderRight: "1px solid var(--b1)", display: "flex", flexDirection: "column", flexShrink: 0, transition: "width .2s", overflow: "hidden" },
-  sHead: { display: "flex", alignItems: "center", gap: 10, padding: "16px 14px", cursor: "pointer", borderBottom: "1px solid var(--b1)" },
-  logo: { width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg,#818cf8,#f472b6)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--fd)", fontWeight: 900, fontSize: 14, color: "#fff", flexShrink: 0 },
-  secLbl: { fontSize: 9, letterSpacing: 2, color: "var(--t3)", textTransform: "uppercase", padding: "16px 14px 6px", fontWeight: 600 },
-  nav: { display: "flex", alignItems: "center", gap: 10, borderRadius: 8, cursor: "pointer", transition: "all .15s", marginBottom: 2, minHeight: 36 },
-  pBadge: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderTop: "1px solid var(--b1)", cursor: "pointer" },
-  main: { flex: 1, overflowY: "auto", padding: "28px 36px 80px", position: "relative", maxWidth: 800 },
-  h1: { fontFamily: "var(--fd)", fontSize: 24, fontWeight: 800, color: "var(--t1)", margin: 0, letterSpacing: -0.5 },
-  sub: { fontSize: 13, color: "var(--t3)", margin: "4px 0 0" },
-  card: { background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 10, padding: 20 },
-  cardLbl: { fontSize: 10, letterSpacing: 2, color: "var(--t3)", textTransform: "uppercase", marginBottom: 16, fontWeight: 600 },
-  mc: { background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 10, padding: 16, cursor: "pointer", transition: "all .15s" },
-  lbl: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--t3)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 1 },
-  inp: { width: "100%", padding: "9px 11px", borderRadius: 7, border: "1px solid var(--b1)", background: "var(--s2)", color: "var(--t1)", fontSize: 13, fontFamily: "var(--fb)", outline: "none", boxSizing: "border-box", transition: "border .2s" },
-  btn: { padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--ac)", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "var(--fd)", cursor: "pointer", letterSpacing: -0.3, transition: "all .15s" },
-  srchW: { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--b1)", background: "var(--s1)", marginBottom: 14 },
-  srchI: { flex: 1, border: "none", background: "none", color: "var(--t1)", fontSize: 13, fontFamily: "var(--fb)", outline: "none" },
-  runB: { width: 34, height: 34, borderRadius: 8, border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, flexShrink: 0, transition: "opacity .2s" },
-  ldW: { padding: "14px 16px", borderRadius: 10, border: "1px solid var(--b1)", background: "var(--s1)", marginBottom: 14 },
-  pTrk: { height: 2, borderRadius: 1, background: "var(--b1)", marginTop: 10, overflow: "hidden" },
-  pBar: { height: "100%", borderRadius: 1, animation: "prog 10s ease-out forwards", width: "0%" },
-  togB: { background: "none", border: "none", color: "var(--t3)", fontSize: 11, cursor: "pointer", padding: "4px 0", fontFamily: "var(--fb)" },
-  rawP: { fontSize: 10, color: "var(--t3)", background: "var(--s2)", borderRadius: 8, padding: 12, overflow: "auto", maxHeight: 180, whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: 6, border: "1px solid var(--b1)" },
-  hItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: 7, background: "var(--s1)", border: "1px solid var(--b1)", marginBottom: 4, cursor: "pointer" },
-  ft: { position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 36px", fontSize: 11, color: "var(--t3)", borderTop: "1px solid var(--b1)", background: "var(--bg)" },
-  keyOv: { position: "fixed", inset: 0, background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
-  onboard: { maxWidth: 440, width: "100%", padding: "36px 32px", textAlign: "left", background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 12 },
-};
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap');
-  :root {
-    --fd:'Outfit',sans-serif; --fb:'Outfit',sans-serif; --fc:'IBM Plex Mono',monospace;
-    --bg:#0b0b0f; --s1:#111118; --s2:#18181f; --b1:#1f1f2a;
-    --t1:#e8e8ed; --t2:#a0a0ab; --t3:#5a5a66;
-    --ac:#818cf8; --navA:#1a1a26; --green:#34d399;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes prog{0%{width:0}15%{width:25%}40%{width:50%}70%{width:75%}100%{width:95%}}
-  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  .spin{display:inline-block;animation:spin .8s linear infinite}
-  input:focus,select:focus{border-color:var(--ac)!important}
-  button:hover{filter:brightness(1.12)}
-  .mc:hover{border-color:var(--ac)!important;transform:translateY(-1px)}
-  ::selection{background:rgba(129,140,248,.25)}
-  ::-webkit-scrollbar{width:5px}
-  ::-webkit-scrollbar-track{background:transparent}
-  ::-webkit-scrollbar-thumb{background:var(--b1);border-radius:3px}
-`;

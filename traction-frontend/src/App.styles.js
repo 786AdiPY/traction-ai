@@ -1,0 +1,22 @@
+/** Inline styles for `App.jsx` only (layout shell, onboarding, dashboard, settings, footer). */
+export const appStyles = {
+  root: { display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg)", fontFamily: "var(--fb)", color: "var(--t1)" },
+  keyOv: { position: "fixed", inset: 0, background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
+  onboard: { maxWidth: 440, width: "100%", padding: "36px 32px", textAlign: "left", background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 12 },
+  side: { height: "100vh", background: "var(--s1)", borderRight: "1px solid var(--b1)", display: "flex", flexDirection: "column", flexShrink: 0, transition: "width .2s", overflow: "hidden" },
+  sHead: { display: "flex", alignItems: "center", gap: 10, padding: "16px 14px", cursor: "pointer", borderBottom: "1px solid var(--b1)" },
+  logo: { width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg,#818cf8,#f472b6)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--fd)", fontWeight: 900, fontSize: 14, color: "#fff", flexShrink: 0 },
+  secLbl: { fontSize: 9, letterSpacing: 2, color: "var(--t3)", textTransform: "uppercase", padding: "16px 14px 6px", fontWeight: 600 },
+  nav: { display: "flex", alignItems: "center", gap: 10, borderRadius: 8, cursor: "pointer", transition: "all .15s", marginBottom: 2, minHeight: 36 },
+  pBadge: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderTop: "1px solid var(--b1)", cursor: "pointer" },
+  main: { flex: 1, overflowY: "auto", padding: "28px 36px 80px", position: "relative", maxWidth: 800 },
+  h1: { fontFamily: "var(--fd)", fontSize: 24, fontWeight: 800, color: "var(--t1)", margin: 0, letterSpacing: -0.5 },
+  sub: { fontSize: 13, color: "var(--t3)", margin: "4px 0 0" },
+  card: { background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 10, padding: 20 },
+  cardLbl: { fontSize: 10, letterSpacing: 2, color: "var(--t3)", textTransform: "uppercase", marginBottom: 16, fontWeight: 600 },
+  mc: { background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 10, padding: 16, cursor: "pointer", transition: "all .15s" },
+  lbl: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--t3)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 1 },
+  inp: { width: "100%", padding: "9px 11px", borderRadius: 7, border: "1px solid var(--b1)", background: "var(--s2)", color: "var(--t1)", fontSize: 13, fontFamily: "var(--fb)", outline: "none", boxSizing: "border-box", transition: "border .2s" },
+  btn: { padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--ac)", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "var(--fd)", cursor: "pointer", letterSpacing: -0.3, transition: "all .15s" },
+  ft: { position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 36px", fontSize: 11, color: "var(--t3)", borderTop: "1px solid var(--b1)", background: "var(--bg)" },
+};
