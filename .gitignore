@@ -3,3 +3,18 @@ fe/dist/
 *.log
 .env
 .env.local
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.DS_Store
+
+# Secrets
+**/src/main/resources/application.properties
