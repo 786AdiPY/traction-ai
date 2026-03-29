@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { appStyles as S } from "./App.styles.js";
 import { MODULES, SECTIONS, getTasks, getSysPrompt } from "./constants/modules.js";
-import { claudeAnalyze, runScrapes } from "./lib/api.js";
+import * as Api from "./lib/api.js";
 import OpinionAIView from "./components/opinionai/OpinionAIView.jsx";
 import CompeteMapView from "./components/competeMap/CompeteMapView.jsx";
 import HireSignalView from "./components/hireSignal/HireSignalView.jsx";
@@ -21,6 +21,7 @@ const INTEL_VIEWS = {
 };
 
 const ANTHROPIC_STORAGE = "traction_anthropic_key";
+const AUTH_STORAGE = "traction_auth";
 
 function readStoredAnthropicKey() {
   try {
@@ -31,7 +32,17 @@ function readStoredAnthropicKey() {
 }
 
 export default function App() {
-  const [launched, setLaunched] = useState(false);
+  // --- Auth & Onboarding State ---
+  const [step, setStep] = useState("loading"); // loading, auth, profile, dashboard
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [isLogin, setIsLogin] = useState(true);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authError, setAuthError] = useState("");
+
+  // --- App State ---
   const [anthropicKey, setAnthropicKey] = useState(readStoredAnthropicKey);
   const [anthropicInput, setAnthropicInput] = useState("");
   const [profile, setProfile] = useState(null);
@@ -41,6 +52,8 @@ export default function App() {
   const [pD, setPD] = useState("");
   const [pS, setPS] = useState("idea");
   const [pC, setPC] = useState("saas");
+  const [pT, setPT] = useState(1);
+  
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState("");
@@ -49,24 +62,93 @@ export default function App() {
   const [showRaw, setShowRaw] = useState(false);
   const [hist, setHist] = useState({});
   const ref = useRef(null);
+
   const mod = MODULES.find((m) => m.id === tab);
   const IntelView = INTEL_VIEWS[tab];
-  const intelProps = {
-    profile,
-    go,
-    query,
-    setQuery,
-    run,
-    loading,
-    phase,
-    analysis,
-    raw,
-    showRaw,
-    setShowRaw,
-    hist,
-    analysisRef: ref,
-  };
 
+  // --- Initialization ---
+  useEffect(() => {
+    async function init() {
+      const stored = localStorage.getItem(AUTH_STORAGE);
+      if (stored) {
+        try {
+          const { token: t, user: u } = JSON.parse(stored);
+          setToken(t);
+          setUser(u);
+          const prof = await Api.getActiveProfile(t);
+          if (prof) {
+            setProfile(prof);
+            setStep("dashboard");
+          } else {
+            setStep("profile");
+          }
+        } catch (e) {
+          localStorage.removeItem(AUTH_STORAGE);
+          setStep("auth");
+        }
+      } else {
+        setStep("auth");
+      }
+    }
+    init();
+  }, []);
+
+  // --- Auth Handlers ---
+  async function handleAuth() {
+    setAuthError("");
+    setLoading(true);
+    try {
+      let res;
+      if (isLogin) {
+        res = await Api.login(authEmail, authPassword);
+      } else {
+        res = await Api.register(authEmail, authPassword, authName);
+      }
+      setToken(res.token);
+      setUser(res.user);
+      localStorage.setItem(AUTH_STORAGE, JSON.stringify(res));
+      
+      const prof = await Api.getActiveProfile(res.token);
+      if (prof) {
+        setProfile(prof);
+        setStep("dashboard");
+      } else {
+        setStep("profile");
+      }
+    } catch (e) {
+      setAuthError(e.message);
+    }
+    setLoading(false);
+  }
+
+  async function handleCreateProfile() {
+    if (!pD.trim()) return;
+    setLoading(true);
+    try {
+      const res = await Api.createProfile(token, {
+        startupName: pN,
+        description: pD,
+        stage: pS.toUpperCase(),
+        category: pC.toUpperCase(),
+        teamSize: pT
+      });
+      setProfile(res);
+      setStep("dashboard");
+    } catch (e) {
+      alert("Error saving profile: " + e.message);
+    }
+    setLoading(false);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(AUTH_STORAGE);
+    setToken(null);
+    setUser(null);
+    setProfile(null);
+    setStep("auth");
+  }
+
+  // --- App Logic ---
   function go(id) {
     setTab(id);
     setQuery("");
@@ -87,7 +169,7 @@ export default function App() {
     try {
       setPhase("Scraping live web data...");
       const tasks = getTasks(mod.id, q);
-      const { data, error } = await runScrapes(tasks);
+      const { data, error } = await Api.runScrapes(tasks);
       setPhase("AI analyzing patterns...");
       const key = anthropicKey.trim();
       let res;
@@ -95,10 +177,9 @@ export default function App() {
       if (data.length > 0) {
         setRaw(data);
         if (!key) {
-          res =
-            "Add an Anthropic API key in Settings (or VITE_ANTHROPIC_API_KEY) to synthesize analysis. Raw search results are available below.";
+          res = "Add an Anthropic API key in Settings (or VITE_ANTHROPIC_API_KEY) to synthesize analysis. Raw search results are available below.";
         } else {
-          res = await claudeAnalyze(key, getSysPrompt(mod.id), `${ctx}\n\nScraped data:\n${JSON.stringify(data, null, 2)}\n\nProvide structured analysis.`);
+          res = await Api.claudeAnalyze(key, getSysPrompt(mod.id), `${ctx}\n\nScraped data:\n${JSON.stringify(data, null, 2)}\n\nProvide structured analysis.`);
         }
       } else {
         const note = error || "Live data unavailable.";
@@ -106,11 +187,7 @@ export default function App() {
         if (!key) {
           res = `${note}\n\nAdd an Anthropic API key in Settings for AI analysis when search data is missing.`;
         } else {
-          res = await claudeAnalyze(
-            key,
-            getSysPrompt(mod.id),
-            `${ctx}\n\n${note}\n\nProvide structured analysis using your knowledge where needed.`
-          );
+          res = await Api.claudeAnalyze(key, getSysPrompt(mod.id), `${ctx}\n\n${note}\n\nProvide structured analysis using your knowledge where needed.`);
         }
       }
       setAnalysis(res || "No analysis returned.");
@@ -128,49 +205,76 @@ export default function App() {
 
   useEffect(() => {
     if (tab === "settings" && profile) {
-      setPN(profile.name || "");
+      setPN(profile.startupName || "");
       setPD(profile.description || "");
-      setPS(profile.stage || "idea");
-      setPC(profile.category || "saas");
+      setPS(profile.stage?.toLowerCase() || "idea");
+      setPC(profile.category?.toLowerCase() || "saas");
     }
   }, [tab, profile]);
-
-  useEffect(() => {
-    if (!MODULES.some((m) => m.id === tab)) setTab("dashboard");
-  }, [tab]);
 
   const stageOpts = ["idea", "mvp", "launched", "revenue", "funded"];
   const catOpts = ["saas", "marketplace", "consumer", "fintech", "healthtech", "ai", "ecommerce", "devtools", "other"];
 
-  const canEnter = pD.trim().length > 0;
+  // --- Rendering Helpers ---
 
-  function handleEnterApp() {
-    if (!canEnter) return;
-    setProfile({ name: pN.trim(), description: pD.trim(), stage: pS, category: pC });
-    setLaunched(true);
+  if (step === "loading") {
+    return <div style={{...S.root, alignItems:'center', justifyContent:'center'}}>Initializing Command Center...</div>;
   }
 
-  function saveAnthropicKey() {
-    const v = anthropicInput.trim();
-    try {
-      if (v) sessionStorage.setItem(ANTHROPIC_STORAGE, v);
-      else sessionStorage.removeItem(ANTHROPIC_STORAGE);
-    } catch {
-      /* ignore */
-    }
-    setAnthropicKey(v || import.meta.env.VITE_ANTHROPIC_API_KEY || "");
-    setAnthropicInput("");
-  }
-
-  if (!launched)
+  if (step === "auth") {
     return (
       <div style={S.root}>
         <div style={S.keyOv}>
           <div style={S.onboard}>
-            <div style={{ fontSize: 10, letterSpacing: 4, color: "var(--t3)", textTransform: "uppercase", marginBottom: 20 }}>Welcome</div>
-            <div style={{ fontFamily: "var(--fd)", fontSize: 28, fontWeight: 800, color: "var(--t1)", letterSpacing: -1, marginBottom: 8 }}>Traction.ai</div>
-            <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 24, lineHeight: 1.5 }}>Tell us about your startup to get started. Web search runs through our API; keys stay on the server.</p>
-            <div style={S.cardLbl}>Startup profile</div>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "var(--t3)", textTransform: "uppercase", marginBottom: 20 }}>Traction Command Center</div>
+            <div style={{ fontFamily: "var(--fd)", fontSize: 28, fontWeight: 800, color: "var(--t1)", letterSpacing: -1, marginBottom: 8 }}>{isLogin ? "Login" : "Sign Up"}</div>
+            <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 24, lineHeight: 1.5 }}>Access your real-time founder dashboard.</p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {!isLogin && (
+                <div>
+                  <label style={S.lbl}>Full Name</label>
+                  <input style={S.inp} placeholder="Jane Doe" value={authName} onChange={(e) => setAuthName(e.target.value)} />
+                </div>
+              )}
+              <div>
+                <label style={S.lbl}>Email</label>
+                <input style={S.inp} placeholder="jane@startup.com" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
+              </div>
+              <div>
+                <label style={S.lbl}>Password</label>
+                <input style={S.inp} type="password" placeholder="••••••••" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAuth()} />
+              </div>
+              {authError && <div style={{ fontSize: 11, color: "var(--red)" }}>{authError}</div>}
+              
+              <button style={{ ...S.btn, marginTop: 8 }} onClick={handleAuth} disabled={loading}>
+                {loading ? "Authenticating..." : isLogin ? "Login →" : "Create Account →"}
+              </button>
+              
+              <div style={{ textAlign: "center", marginTop: 12 }}>
+                <span style={{ fontSize: 12, color: "var(--t3)" }}>
+                  {isLogin ? "New to Traction?" : "Already have an account?"}{" "}
+                  <button style={{ background: "none", border: "none", color: "var(--ac)", fontWeight: 600, cursor: "pointer", fontSize: 12 }} onClick={() => setIsLogin(!isLogin)}>
+                    {isLogin ? "Sign Up" : "Login"}
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "profile") {
+    return (
+      <div style={S.root}>
+        <div style={S.keyOv}>
+          <div style={S.onboard}>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "var(--t3)", textTransform: "uppercase", marginBottom: 20 }}>Founder Onboarding</div>
+            <div style={{ fontFamily: "var(--fd)", fontSize: 28, fontWeight: 800, color: "var(--t1)", letterSpacing: -1, marginBottom: 8 }}>Startup Profile</div>
+            <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 24, lineHeight: 1.5 }}>Tell us about your startup to customize your command center signals.</p>
+            
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={S.lbl}>Company or product name</label>
@@ -178,21 +282,13 @@ export default function App() {
               </div>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={S.lbl}>What are you building?</label>
-                <input
-                  style={S.inp}
-                  placeholder="AI-powered analytics for e-commerce"
-                  value={pD}
-                  onChange={(e) => setPD(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && canEnter && handleEnterApp()}
-                />
+                <input style={S.inp} placeholder="AI-powered analytics for e-commerce" value={pD} onChange={(e) => setPD(e.target.value)} />
               </div>
               <div>
                 <label style={S.lbl}>Stage</label>
                 <select style={S.inp} value={pS} onChange={(e) => setPS(e.target.value)}>
                   {stageOpts.map((s) => (
-                    <option key={s} value={s}>
-                      {s[0].toUpperCase() + s.slice(1)}
-                    </option>
+                    <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                   ))}
                 </select>
               </div>
@@ -200,20 +296,38 @@ export default function App() {
                 <label style={S.lbl}>Category</label>
                 <select style={S.inp} value={pC} onChange={(e) => setPC(e.target.value)}>
                   {catOpts.map((s) => (
-                    <option key={s} value={s}>
-                      {s[0].toUpperCase() + s.slice(1)}
-                    </option>
+                    <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                   ))}
                 </select>
               </div>
             </div>
-            <button style={{ ...S.btn, width: "100%", marginTop: 20, opacity: canEnter ? 1 : 0.4 }} disabled={!canEnter} onClick={handleEnterApp}>
-              Enter app →
+            
+            <button style={{ ...S.btn, width: "100%", marginTop: 20, opacity: pD ? 1 : 0.4 }} disabled={!pD || loading} onClick={handleCreateProfile}>
+              {loading ? "Creating Profile..." : "Initialize Command Center →"}
             </button>
           </div>
         </div>
       </div>
     );
+  }
+
+  const intelProps = {
+    profile,
+    go,
+    query,
+    setQuery,
+    run,
+    loading,
+    phase,
+    analysis,
+    raw,
+    showRaw,
+    setShowRaw,
+    hist,
+    analysisRef: ref,
+  };
+
+  if (step !== "dashboard") return null;
 
   return (
     <div style={S.root}>
@@ -263,6 +377,18 @@ export default function App() {
             </div>
           ))}
         </div>
+        
+        {!collapsed && (
+          <div style={{ padding: "0 14px 14px" }}>
+            <button 
+              onClick={handleLogout}
+              style={{ ...S.btn, width: "100%", background: "transparent", border: "1px solid var(--b1)", color: "var(--t3)", fontSize: 11 }}
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
+
         {!collapsed && profile && (
           <div style={S.pBadge} onClick={() => go("settings")}>
             <div
@@ -280,10 +406,10 @@ export default function App() {
                 flexShrink: 0,
               }}
             >
-              {(profile.name || "S")[0].toUpperCase()}
+              {(profile.startupName || "S")[0].toUpperCase()}
             </div>
             <div style={{ overflow: "hidden", minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{profile.name || "My Startup"}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{profile.startupName || "My Startup"}</div>
               <div style={{ fontSize: 10, color: "var(--t3)" }}>
                 {profile.stage} · {profile.category}
               </div>
@@ -295,60 +421,21 @@ export default function App() {
       <main style={S.main}>
         {tab === "dashboard" && (
           <div style={{ animation: "fadeUp .3s ease" }}>
-            <h1 style={S.h1}>{profile ? `Welcome back${profile.name ? ", " + profile.name : ""}` : "Welcome to Traction.ai"}</h1>
-            <p style={S.sub}>{profile ? "Pick a module to begin." : "Set up your startup profile first."}</p>
-            {!profile && (
-              <div style={{ ...S.card, marginTop: 24 }}>
-                <div style={S.cardLbl}>Startup Profile</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <label style={S.lbl}>Name</label>
-                    <input style={S.inp} placeholder="Acme Analytics" value={pN} onChange={(e) => setPN(e.target.value)} />
-                  </div>
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <label style={S.lbl}>What are you building?</label>
-                    <input style={S.inp} placeholder="AI-powered analytics for e-commerce" value={pD} onChange={(e) => setPD(e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={S.lbl}>Stage</label>
-                    <select style={S.inp} value={pS} onChange={(e) => setPS(e.target.value)}>
-                      {stageOpts.map((s) => (
-                        <option key={s} value={s}>
-                          {s[0].toUpperCase() + s.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={S.lbl}>Category</label>
-                    <select style={S.inp} value={pC} onChange={(e) => setPC(e.target.value)}>
-                      {catOpts.map((s) => (
-                        <option key={s} value={s}>
-                          {s[0].toUpperCase() + s.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            <h1 style={S.h1}>{profile ? `Welcome back, ${user?.fullName || "Founder"}` : "Welcome to Traction.ai"}</h1>
+            <p style={S.sub}>{profile ? `Analyzing the public web for ${profile.startupName}` : "Set up your startup profile first."}</p>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, marginTop: 24 }}>
+              {MODULES.filter((m) => m.section !== "home" && m.section !== "sys").map((m) => (
+                <div key={m.id} className="mc" style={S.mc} onClick={() => go(m.id)}>
+                  <div style={{ fontSize: 20, marginBottom: 6, color: m.color }}>{m.icon}</div>
+                  <div style={{ fontFamily: "var(--fd)", fontSize: 13, fontWeight: 700, color: "var(--t1)" }}>{m.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>{m.desc}</div>
+                  {hist[m.id] && (
+                    <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 8, borderTop: "1px solid var(--b1)", paddingTop: 6 }}>{hist[m.id].length} queries</div>
+                  )}
                 </div>
-                <button style={{ ...S.btn, width: "100%", marginTop: 16, opacity: pD ? 1 : 0.4 }} disabled={!pD} onClick={() => setProfile({ name: pN, description: pD, stage: pS, category: pC })}>
-                  Save Profile
-                </button>
-              </div>
-            )}
-            {profile && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, marginTop: 24 }}>
-                {MODULES.filter((m) => m.section !== "home" && m.section !== "sys").map((m) => (
-                  <div key={m.id} className="mc" style={S.mc} onClick={() => go(m.id)}>
-                    <div style={{ fontSize: 20, marginBottom: 6, color: m.color }}>{m.icon}</div>
-                    <div style={{ fontFamily: "var(--fd)", fontSize: 13, fontWeight: 700, color: "var(--t1)" }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>{m.desc}</div>
-                    {hist[m.id] && (
-                      <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 8, borderTop: "1px solid var(--b1)", paddingTop: 6 }}>{hist[m.id].length} queries</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
@@ -371,9 +458,7 @@ export default function App() {
                   <label style={S.lbl}>Stage</label>
                   <select style={S.inp} value={pS} onChange={(e) => setPS(e.target.value)}>
                     {stageOpts.map((s) => (
-                      <option key={s} value={s}>
-                        {s[0].toUpperCase() + s.slice(1)}
-                      </option>
+                      <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                     ))}
                   </select>
                 </div>
@@ -381,32 +466,25 @@ export default function App() {
                   <label style={S.lbl}>Category</label>
                   <select style={S.inp} value={pC} onChange={(e) => setPC(e.target.value)}>
                     {catOpts.map((s) => (
-                      <option key={s} value={s}>
-                        {s[0].toUpperCase() + s.slice(1)}
-                      </option>
+                      <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                     ))}
                   </select>
                 </div>
               </div>
-              <button style={{ ...S.btn, marginTop: 16 }} onClick={() => setProfile({ name: pN, description: pD, stage: pS, category: pC })}>
-                Update
-              </button>
+              <button style={{ ...S.btn, marginTop: 16 }} onClick={handleCreateProfile}>Update Profile</button>
             </div>
+            
             <div style={{ ...S.card, marginTop: 12 }}>
               <div style={S.cardLbl}>Anthropic (analysis)</div>
-              <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 12 }}>Stored in session storage on this browser. Optional if you set VITE_ANTHROPIC_API_KEY at build time.</p>
+              <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 12 }}>Stored in session storage on this browser.</p>
               <label style={S.lbl}>API key</label>
               <input style={S.inp} type="password" placeholder="sk-ant-..." value={anthropicInput} onChange={(e) => setAnthropicInput(e.target.value)} />
-              <button style={{ ...S.btn, marginTop: 12 }} onClick={saveAnthropicKey}>
-                Save key
-              </button>
-              <div style={{ marginTop: 10, fontSize: 11, color: anthropicKey ? "var(--green)" : "var(--t3)" }}>{anthropicKey ? "● Analysis key set" : "○ No analysis key (search still works)"}</div>
-            </div>
-            <div style={{ ...S.card, marginTop: 12 }}>
-              <div style={S.cardLbl}>Web search</div>
-              <p style={{ fontSize: 12, color: "var(--t3)", margin: 0, lineHeight: 1.6 }}>
-                Handled by our API at <code style={{ fontSize: 11, color: "var(--t2)" }}>POST /v1/automation/run-sse</code>. TinyFish credentials live in server environment only.
-              </p>
+              <button style={{ ...S.btn, marginTop: 12 }} onClick={() => {
+                const v = anthropicInput.trim();
+                if (v) sessionStorage.setItem(ANTHROPIC_STORAGE, v);
+                setAnthropicKey(v);
+                setAnthropicInput("");
+              }}>Save key</button>
             </div>
           </div>
         )}

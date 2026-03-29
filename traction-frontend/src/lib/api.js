@@ -1,5 +1,48 @@
-const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080").replace(/\/$/, "");
 const CL_API = "https://api.anthropic.com/v1/messages";
+
+/** Auth & Profile API Helpers */
+export async function login(email, password) {
+  const r = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!r.ok) throw new Error("Invalid credentials");
+  return r.json();
+}
+
+export async function register(email, password, fullName) {
+  const r = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, fullName }),
+  });
+  if (!r.ok) throw new Error("Registration failed");
+  return r.json();
+}
+
+export async function getActiveProfile(token) {
+  const r = await fetch(`${API_BASE}/api/profiles/active`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (r.status === 204) return null;
+  if (!r.ok) throw new Error("Could not fetch profile");
+  return r.json();
+}
+
+export async function createProfile(token, profile) {
+  const r = await fetch(`${API_BASE}/api/profiles`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify(profile),
+  });
+  if (!r.ok) throw new Error("Could not save profile");
+  return r.json();
+}
 
 /** POST /v1/automation/run-sse on your API (TinyFish key only in server env). */
 function runSseUrl() {
