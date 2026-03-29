@@ -1,5 +1,9 @@
 fe/node_modules/
 fe/dist/
+
+# Frontend (Vite) — never commit deps or build output; Vercel runs npm install + build
+traction-frontend/node_modules/
+traction-frontend/dist/
 *.log
 .env
 .env.local
