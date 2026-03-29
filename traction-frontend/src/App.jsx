@@ -20,16 +20,7 @@ const INTEL_VIEWS = {
   churn: ChurnSenseView,
 };
 
-const ANTHROPIC_STORAGE = "traction_anthropic_key";
 const AUTH_STORAGE = "traction_auth";
-
-function readStoredAnthropicKey() {
-  try {
-    return sessionStorage.getItem(ANTHROPIC_STORAGE) || import.meta.env.VITE_ANTHROPIC_API_KEY || "";
-  } catch {
-    return import.meta.env.VITE_ANTHROPIC_API_KEY || "";
-  }
-}
 
 export default function App() {
   // --- Auth & Onboarding State ---
@@ -43,8 +34,6 @@ export default function App() {
   const [authError, setAuthError] = useState("");
 
   // --- App State ---
-  const [anthropicKey, setAnthropicKey] = useState(readStoredAnthropicKey);
-  const [anthropicInput, setAnthropicInput] = useState("");
   const [profile, setProfile] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
@@ -167,27 +156,40 @@ export default function App() {
     setRaw(null);
     setShowRaw(false);
     try {
-      setPhase("Scraping live web data...");
+      setPhase("Scraping live web data (TinyFish)...");
       const tasks = getTasks(mod.id, q);
       const { data, error } = await Api.runScrapes(tasks);
-      setPhase("AI analyzing patterns...");
-      const key = anthropicKey.trim();
+      setPhase("Synthesizing with OpenRouter...");
+      const founderCtx = [
+        `Founder: ${user?.fullName || "N/A"} <${user?.email || "N/A"}>.`,
+        `Active startup profile — Name: ${profile?.startupName || "N/A"}`,
+        `Description: ${profile?.description || "N/A"}`,
+        `Stage: ${profile?.stage || "N/A"}, Category: ${profile?.category || "N/A"}, Team size: ${profile?.teamSize ?? "N/A"}.`,
+        `Question / topic: "${q}".`,
+      ].join("\n");
+      const opinionOpts = mod.id === "opinion" ? { maxTokens: 8192 } : { maxTokens: 4096 };
       let res;
-      const ctx = `Founder asked: "${q}". Startup: ${profile?.description || "N/A"}, Stage: ${profile?.stage || "N/A"}, Category: ${profile?.category || "N/A"}.`;
       if (data.length > 0) {
         setRaw(data);
-        if (!key) {
-          res = "Add an Anthropic API key in Settings (or VITE_ANTHROPIC_API_KEY) to synthesize analysis. Raw search results are available below.";
-        } else {
-          res = await Api.claudeAnalyze(key, getSysPrompt(mod.id), `${ctx}\n\nScraped data:\n${JSON.stringify(data, null, 2)}\n\nProvide structured analysis.`);
+        res = await Api.llmAnalyze(
+          getSysPrompt(mod.id),
+          `${founderCtx}\n\nScraped data (JSON from TinyFish):\n${JSON.stringify(data, null, 2)}\n\nFollow the required section format in your system instructions.`,
+          opinionOpts
+        );
+        if (!res?.trim()) {
+          res =
+            "Analysis unavailable. Ensure the Spring API is running with OPENROUTER_API_KEY set and POST /v1/llm/chat reachable. Raw TinyFish payloads are below.";
         }
       } else {
         const note = error || "Live data unavailable.";
         setRaw([{ note }]);
-        if (!key) {
-          res = `${note}\n\nAdd an Anthropic API key in Settings for AI analysis when search data is missing.`;
-        } else {
-          res = await Api.claudeAnalyze(key, getSysPrompt(mod.id), `${ctx}\n\n${note}\n\nProvide structured analysis using your knowledge where needed.`);
+        res = await Api.llmAnalyze(
+          getSysPrompt(mod.id),
+          `${founderCtx}\n\n${note}\n\nNo scrape payloads. Still produce the required sections; state that web research was missing.`,
+          opinionOpts
+        );
+        if (!res?.trim()) {
+          res = `${note}\n\nConfigure TinyFish (tiny_fish) on the server and OPENROUTER_API_KEY for OpenRouter synthesis.`;
         }
       }
       setAnalysis(res || "No analysis returned.");
@@ -209,6 +211,7 @@ export default function App() {
       setPD(profile.description || "");
       setPS(profile.stage?.toLowerCase() || "idea");
       setPC(profile.category?.toLowerCase() || "saas");
+      setPT(profile.teamSize ?? 1);
     }
   }, [tab, profile]);
 
@@ -475,16 +478,12 @@ export default function App() {
             </div>
             
             <div style={{ ...S.card, marginTop: 12 }}>
-              <div style={S.cardLbl}>Anthropic (analysis)</div>
-              <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 12 }}>Stored in session storage on this browser.</p>
-              <label style={S.lbl}>API key</label>
-              <input style={S.inp} type="password" placeholder="sk-ant-..." value={anthropicInput} onChange={(e) => setAnthropicInput(e.target.value)} />
-              <button style={{ ...S.btn, marginTop: 12 }} onClick={() => {
-                const v = anthropicInput.trim();
-                if (v) sessionStorage.setItem(ANTHROPIC_STORAGE, v);
-                setAnthropicKey(v);
-                setAnthropicInput("");
-              }}>Save key</button>
+              <div style={S.cardLbl}>AI analysis</div>
+              <p style={{ fontSize: 12, color: "var(--t3)", margin: 0, lineHeight: 1.6 }}>
+                Synthesis uses <strong>OpenRouter</strong> on your Spring API (<code style={{ fontSize: 11, color: "var(--t2)" }}>OPENROUTER_API_KEY</code> + <code style={{ fontSize: 11, color: "var(--t2)" }}>model</code> in{" "}
+                <code style={{ fontSize: 11, color: "var(--t2)" }}>application.properties</code>). Scrapes go through <code style={{ fontSize: 11, color: "var(--t2)" }}>tiny_fish</code> →{" "}
+                <code style={{ fontSize: 11, color: "var(--t2)" }}>POST /v1/automation/run-sse</code>.
+              </p>
             </div>
           </div>
         )}
@@ -492,7 +491,7 @@ export default function App() {
         {IntelView && <IntelView {...intelProps} />}
 
         <div style={S.ft}>
-          Powered by <strong>TinyFish</strong> × <strong>Claude API</strong>
+          Powered by <strong>TinyFish</strong> × <strong>OpenRouter</strong>
         </div>
       </main>
     </div>

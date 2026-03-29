@@ -1,10 +1,14 @@
 package StalWart.traction.ai.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @Table(name = "profiles", indexes = {
     @Index(name = "idx_profiles_user", columnList = "user_id")
 })
@@ -74,6 +78,7 @@ public class Profile {
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
 
+    @JsonIgnore
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
 

@@ -16,6 +16,7 @@ export default function IntelModuleView({
   setShowRaw,
   hist,
   analysisRef,
+  renderAnalysis,
 }) {
   if (!mod) return null;
 
@@ -70,10 +71,14 @@ export default function IntelModuleView({
 
           {analysis && (
             <div ref={analysisRef} style={{ animation: "fadeUp .35s ease" }}>
-              <div style={{ ...I.card, borderTop: `2px solid ${mod.color}` }}>
-                <div style={{ ...I.analysisSectionLabel, color: mod.color }}>Analysis</div>
-                <Analysis text={analysis} color={mod.color} />
-              </div>
+              {renderAnalysis ? (
+                renderAnalysis(analysis, mod)
+              ) : (
+                <div style={{ ...I.card, borderTop: `2px solid ${mod.color}` }}>
+                  <div style={{ ...I.analysisSectionLabel, color: mod.color }}>Analysis</div>
+                  <Analysis text={analysis} color={mod.color} />
+                </div>
+              )}
               {raw && !raw[0]?.note && (
                 <div style={{ marginTop: 8 }}>
                   <button style={I.togB} onClick={() => setShowRaw(!showRaw)}>

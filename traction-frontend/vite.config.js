@@ -7,10 +7,8 @@ export default defineConfig({
     port: 5173,
     // Proxy API when VITE_API_BASE is empty (dev)
     proxy: {
-      "/v1": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-      },
+      "/api": { target: "http://localhost:8080", changeOrigin: true },
+      "/v1": { target: "http://localhost:8080", changeOrigin: true },
     },
   },
 });

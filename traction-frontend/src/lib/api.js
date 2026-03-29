@@ -1,9 +1,14 @@
-const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080").replace(/\/$/, "");
-const CL_API = "https://api.anthropic.com/v1/messages";
+/** Empty base uses same-origin paths (Vite dev: proxy /api and /v1 → backend). */
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
-/** Auth & Profile API Helpers */
+export function apiUrl(path) {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return API_BASE ? `${API_BASE}${p}` : p;
+}
+
+/** Auth & Profile */
 export async function login(email, password) {
-  const r = await fetch(`${API_BASE}/api/auth/login`, {
+  const r = await fetch(apiUrl("/api/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -13,7 +18,7 @@ export async function login(email, password) {
 }
 
 export async function register(email, password, fullName) {
-  const r = await fetch(`${API_BASE}/api/auth/register`, {
+  const r = await fetch(apiUrl("/api/auth/register"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, fullName }),
@@ -23,8 +28,8 @@ export async function register(email, password, fullName) {
 }
 
 export async function getActiveProfile(token) {
-  const r = await fetch(`${API_BASE}/api/profiles/active`, {
-    headers: { "Authorization": `Bearer ${token}` },
+  const r = await fetch(apiUrl("/api/profiles/active"), {
+    headers: { Authorization: `Bearer ${token}` },
   });
   if (r.status === 204) return null;
   if (!r.ok) throw new Error("Could not fetch profile");
@@ -32,11 +37,11 @@ export async function getActiveProfile(token) {
 }
 
 export async function createProfile(token, profile) {
-  const r = await fetch(`${API_BASE}/api/profiles`, {
+  const r = await fetch(apiUrl("/api/profiles"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(profile),
   });
@@ -44,9 +49,8 @@ export async function createProfile(token, profile) {
   return r.json();
 }
 
-/** POST /v1/automation/run-sse on your API (TinyFish key only in server env). */
 function runSseUrl() {
-  return API_BASE.length > 0 ? `${API_BASE}/v1/automation/run-sse` : "/v1/automation/run-sse";
+  return apiUrl("/v1/automation/run-sse");
 }
 
 export async function tfScrape(url, goal) {
@@ -58,7 +62,7 @@ export async function tfScrape(url, goal) {
     });
     if (!r.ok) {
       if (r.status === 503)
-        return { _error: "Search unavailable. Run the API and set TINYFISH_API_KEY on the server." };
+        return { _error: "Search unavailable. Configure tiny_fish on the server or check the TinyFish proxy." };
       return { _error: `Search failed (${r.status}).` };
     }
     const txt = await r.text();
@@ -68,7 +72,7 @@ export async function tfScrape(url, goal) {
         const d = JSON.parse(line.replace(/^data:\s*/, ""));
         if (d.type === "COMPLETE" && d.status === "COMPLETED") return d.result || d.resultJson || d;
       } catch {
-        /* skip malformed chunk */
+        /* skip */
       }
     }
   } catch {
@@ -77,26 +81,19 @@ export async function tfScrape(url, goal) {
   return null;
 }
 
-export async function claudeAnalyze(apiKey, sys, usr) {
-  if (!apiKey) return "";
+/** OpenRouter via Spring POST /v1/llm/chat (key on server only). */
+export async function llmAnalyze(system, userMessage, opts = {}) {
+  const max_tokens = opts.maxTokens ?? 2048;
   try {
-    const r = await fetch(CL_API, {
+    const r = await fetch(apiUrl("/v1/llm/chat"), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: sys,
-        messages: [{ role: "user", content: usr }],
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ system, user: userMessage, max_tokens }),
     });
-    const d = await r.json();
-    return d.content?.[0]?.text || "";
-  } catch {
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) return d.text ?? d.content ?? "";
+    return d.error ? `[Analysis] ${d.error}` : "";
+  } catch (e) {
     return "";
   }
 }
@@ -105,15 +102,18 @@ export async function runScrapes(tasks) {
   const results = await Promise.allSettled(tasks.map((t) => tfScrape(t.url, t.goal)));
   let error = null;
   const data = [];
-  for (const r of results) {
-    if (r.status !== "fulfilled") continue;
+  results.forEach((r, i) => {
+    if (r.status !== "fulfilled") return;
     const v = r.value;
-    if (!v) continue;
+    if (!v) return;
     if (v._error) {
       error = error || v._error;
-      continue;
+      return;
     }
-    data.push(v);
-  }
+    const t = tasks[i];
+    if (t.source != null || t.bucket != null)
+      data.push({ source: t.source, bucket: t.bucket, url: t.url, scraped: v });
+    else data.push(v);
+  });
   return { data, error };
 }
