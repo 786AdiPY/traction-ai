@@ -340,6 +340,7 @@ export default function OpinionAIView(props) {
   return (
     <IntelModuleView
       mod={MOD}
+      showSearch
       renderAnalysis={(analysisText) => (
         <OpinionStructuredAnalysis text={analysisText} profile={props.profile} raw={props.raw} />
       )}

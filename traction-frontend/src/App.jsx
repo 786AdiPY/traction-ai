@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { appStyles as S } from "./App.styles.js";
+import TractionLogo from "./components/brand/TractionLogo.jsx";
 import { MODULES, SECTIONS, getTasks, getSysPrompt } from "./constants/modules.js";
 import * as Api from "./lib/api.js";
+import { shrinkScrapeBundleForLlm } from "./lib/intelCompact.js";
 import OpinionAIView from "./components/opinionai/OpinionAIView.jsx";
 import CompeteMapView from "./components/competeMap/CompeteMapView.jsx";
 import HireSignalView from "./components/hireSignal/HireSignalView.jsx";
 import InvestorRadarView from "./components/investorRadar/InvestorRadarView.jsx";
-import RegLensView from "./components/regLens/RegLensView.jsx";
 import PriceLabView from "./components/priceLab/PriceLabView.jsx";
 import ChurnSenseView from "./components/churnSense/ChurnSenseView.jsx";
 
@@ -15,7 +17,6 @@ const INTEL_VIEWS = {
   compete: CompeteMapView,
   hire: HireSignalView,
   investor: InvestorRadarView,
-  reg: RegLensView,
   price: PriceLabView,
   churn: ChurnSenseView,
 };
@@ -23,6 +24,10 @@ const INTEL_VIEWS = {
 const AUTH_STORAGE = "traction_auth";
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
   // --- Auth & Onboarding State ---
   const [step, setStep] = useState("loading"); // loading, auth, profile, dashboard
   const [user, setUser] = useState(null);
@@ -83,6 +88,31 @@ export default function App() {
     init();
   }, []);
 
+  useEffect(() => {
+    if (searchParams.get("signup") === "1") setIsLogin(false);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (step === "loading") return;
+    const p = location.pathname.replace(/\/$/, "") || "/";
+    const path = p === "" ? "/" : p;
+    if (path !== "/login" && path !== "/app") {
+      navigate(token ? "/app" : "/login", { replace: true });
+      return;
+    }
+    if (!token && path === "/app") {
+      navigate("/login", { replace: true });
+      return;
+    }
+    if (token && (step === "dashboard" || step === "profile") && path === "/login") {
+      navigate("/app", { replace: true });
+      return;
+    }
+    if (!token && step === "auth" && path === "/app") {
+      navigate("/login", { replace: true });
+    }
+  }, [step, token, location.pathname, navigate]);
+
   // --- Auth Handlers ---
   async function handleAuth() {
     setAuthError("");
@@ -105,6 +135,7 @@ export default function App() {
       } else {
         setStep("profile");
       }
+      navigate("/app", { replace: true });
     } catch (e) {
       setAuthError(e.message);
     }
@@ -124,6 +155,7 @@ export default function App() {
       });
       setProfile(res);
       setStep("dashboard");
+      navigate("/app", { replace: true });
     } catch (e) {
       alert("Error saving profile: " + e.message);
     }
@@ -136,10 +168,12 @@ export default function App() {
     setUser(null);
     setProfile(null);
     setStep("auth");
+    navigate("/", { replace: true });
   }
 
   // --- App Logic ---
   function go(id) {
+    if (location.pathname !== "/app") navigate("/app");
     setTab(id);
     setQuery("");
     setAnalysis("");
@@ -180,10 +214,10 @@ export default function App() {
     const startedAt = performance.now();
     let scrapeBlob = [];
     try {
-      setPhase("TinyFish: 3 browser runs (often 1–3 min each)…");
       const tasks = getTasks(mod.id, q);
+      setPhase(`TinyFish: ${tasks.length} browser run (minimum scrape mode)…`);
       const { data, error } = await Api.runScrapes(tasks);
-      setPhase("Synthesizing with OpenRouter...");
+      setPhase("Synthesizing with OpenRouter…");
       const founderCtx = [
         `Founder: ${user?.fullName || "N/A"} <${user?.email || "N/A"}>.`,
         `Active startup profile — Name: ${profile?.startupName || "N/A"}`,
@@ -191,14 +225,16 @@ export default function App() {
         `Stage: ${profile?.stage || "N/A"}, Category: ${profile?.category || "N/A"}, Team size: ${profile?.teamSize ?? "N/A"}.`,
         `Question / topic: "${q}".`,
       ].join("\n");
-      const opinionOpts = mod.id === "opinion" ? { maxTokens: 8192 } : { maxTokens: 4096 };
+      const opinionOpts =
+        mod.id === "opinion" ? { maxTokens: 4096 } : mod.id === "investor" ? { maxTokens: 4096 } : { maxTokens: 3072 };
       let res;
       if (data.length > 0) {
         scrapeBlob = data;
         setRaw(data);
+        const forLlm = shrinkScrapeBundleForLlm(data);
         res = await Api.llmAnalyze(
           getSysPrompt(mod.id),
-          `${founderCtx}\n\nScraped data (JSON from TinyFish):\n${JSON.stringify(data, null, 2)}\n\nFollow the required section format in your system instructions.`,
+          `${founderCtx}\n\nScraped data (JSON from TinyFish):\n${JSON.stringify(forLlm, null, 2)}\n\nFollow the required section format in your system instructions.`,
           opinionOpts
         );
         if (!res?.trim()) {
@@ -268,6 +304,14 @@ export default function App() {
       <div style={S.root}>
         <div style={S.keyOv}>
           <div style={S.onboard}>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, background: "none", border: "none", padding: 0, cursor: "pointer" }}
+            >
+              <TractionLogo size={32} />
+              <span style={{ fontFamily: "var(--fd)", fontSize: 18, fontWeight: 800, color: "var(--t1)", letterSpacing: -0.5 }}>Traction.ai</span>
+            </button>
             <div style={{ fontSize: 10, letterSpacing: 4, color: "var(--t3)", textTransform: "uppercase", marginBottom: 20 }}>Traction Command Center</div>
             <div style={{ fontFamily: "var(--fd)", fontSize: 28, fontWeight: 800, color: "var(--t1)", letterSpacing: -1, marginBottom: 8 }}>{isLogin ? "Login" : "Sign Up"}</div>
             <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 24, lineHeight: 1.5 }}>Access your real-time founder dashboard.</p>
@@ -313,6 +357,14 @@ export default function App() {
       <div style={S.root}>
         <div style={S.keyOv}>
           <div style={S.onboard}>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, background: "none", border: "none", padding: 0, cursor: "pointer" }}
+            >
+              <TractionLogo size={32} />
+              <span style={{ fontFamily: "var(--fd)", fontSize: 18, fontWeight: 800, color: "var(--t1)", letterSpacing: -0.5 }}>Traction.ai</span>
+            </button>
             <div style={{ fontSize: 10, letterSpacing: 4, color: "var(--t3)", textTransform: "uppercase", marginBottom: 20 }}>Founder Onboarding</div>
             <div style={{ fontFamily: "var(--fd)", fontSize: 28, fontWeight: 800, color: "var(--t1)", letterSpacing: -1, marginBottom: 8 }}>Startup Profile</div>
             <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 24, lineHeight: 1.5 }}>Tell us about your startup to customize your command center signals.</p>
@@ -370,13 +422,11 @@ export default function App() {
     analysisRef: ref,
   };
 
-  if (step !== "dashboard") return null;
-
   return (
     <div style={S.root}>
       <nav style={{ ...S.side, width: collapsed ? 56 : 224 }}>
         <div style={S.sHead} onClick={() => setCollapsed(!collapsed)}>
-          <div style={S.logo}>T</div>
+          <TractionLogo size={28} />
           {!collapsed && (
             <div>
               <div style={{ fontFamily: "var(--fd)", fontSize: 15, fontWeight: 800, color: "var(--t1)", letterSpacing: -0.5 }}>Traction.ai</div>
@@ -462,12 +512,13 @@ export default function App() {
       </nav>
 
       <main style={S.main}>
+        <div style={S.mainScroll}>
         {tab === "dashboard" && (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <h1 style={S.h1}>{profile ? `Welcome back, ${user?.fullName || "Founder"}` : "Welcome to Traction.ai"}</h1>
             <p style={S.sub}>{profile ? `Analyzing the public web for ${profile.startupName}` : "Set up your startup profile first."}</p>
             
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, marginTop: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14, marginTop: 24, width: "100%" }}>
               {MODULES.filter((m) => m.section !== "home" && m.section !== "sys").map((m) => (
                 <div key={m.id} className="mc" style={S.mc} onClick={() => go(m.id)}>
                   <div style={{ fontSize: 20, marginBottom: 6, color: m.color }}>{m.icon}</div>
@@ -529,10 +580,11 @@ export default function App() {
         )}
 
         {IntelView && <IntelView {...intelProps} />}
-
-        <div style={S.ft}>
-          Powered by <strong>TinyFish</strong> × <strong>OpenRouter</strong>
         </div>
+
+        <footer style={S.ft}>
+          Powered by <strong>TinyFish</strong> × <strong>OpenRouter</strong>
+        </footer>
       </main>
     </div>
   );

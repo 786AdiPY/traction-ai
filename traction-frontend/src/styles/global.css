@@ -1,7 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
 :root {
-  --fd: "Outfit", sans-serif;
+  --fd: "Syne", "Outfit", sans-serif;
   --fb: "Outfit", sans-serif;
   --fc: "IBM Plex Mono", monospace;
   --bg: #0b0b0f;

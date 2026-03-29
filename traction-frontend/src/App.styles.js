@@ -9,7 +9,8 @@ export const appStyles = {
   secLbl: { fontSize: 9, letterSpacing: 2, color: "var(--t3)", textTransform: "uppercase", padding: "16px 14px 6px", fontWeight: 600 },
   nav: { display: "flex", alignItems: "center", gap: 10, borderRadius: 8, cursor: "pointer", transition: "all .15s", marginBottom: 2, minHeight: 36 },
   pBadge: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderTop: "1px solid var(--b1)", cursor: "pointer" },
-  main: { flex: 1, overflowY: "auto", padding: "28px 36px 36px", position: "relative", maxWidth: 800 },
+  main: { flex: 1, minWidth: 0, minHeight: 0, width: "100%", display: "flex", flexDirection: "column", position: "relative" },
+  mainScroll: { flex: 1, minHeight: 0, overflowY: "auto", padding: "28px 40px 32px" },
   h1: { fontFamily: "var(--fd)", fontSize: 24, fontWeight: 800, color: "var(--t1)", margin: 0, letterSpacing: -0.5 },
   sub: { fontSize: 13, color: "var(--t3)", margin: "4px 0 0" },
   card: { background: "var(--s1)", border: "1px solid var(--b1)", borderRadius: 10, padding: 20 },
@@ -18,5 +19,5 @@ export const appStyles = {
   lbl: { display: "block", fontSize: 10, fontWeight: 600, color: "var(--t3)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 1 },
   inp: { width: "100%", padding: "9px 11px", borderRadius: 7, border: "1px solid var(--b1)", background: "var(--s2)", color: "var(--t1)", fontSize: 13, fontFamily: "var(--fb)", outline: "none", boxSizing: "border-box", transition: "border .2s" },
   btn: { padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--ac)", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "var(--fd)", cursor: "pointer", letterSpacing: -0.3, transition: "all .15s" },
-  ft: { marginTop: 32, paddingTop: 16, fontSize: 11, color: "var(--t3)", borderTop: "1px solid var(--b1)" },
+  ft: { flexShrink: 0, padding: "14px 40px 24px", fontSize: 11, color: "var(--t3)", borderTop: "1px solid var(--b1)", background: "var(--bg)" },
 };
