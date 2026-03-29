@@ -19,8 +19,8 @@ export const SECTIONS = [
 
 const str = JSON.stringify;
 
+/** Fewer parallel jobs = faster perceived completion; each TinyFish run is slow. */
 function opinionTasks(q) {
-  const eq = encodeURIComponent(q);
   const pos = "positive";
   const neg = "negative";
   const item = `[{"title":str,"url_or_permalink":str,"snippet":str}]`;
@@ -32,40 +32,16 @@ function opinionTasks(q) {
       goal: `Topic: ${str(q)}. Extract up to 5 posts where founders saw positive outcomes (traction, PMF, GTM). JSON ${item}.`,
     },
     {
-      url: `https://www.reddit.com/r/SaaS/search/?q=${encodeURIComponent(`${q} worked pricing growth`)}&restrict_sr=1`,
-      source: "r/SaaS (signals)",
-      bucket: pos,
-      goal: `Topic: ${str(q)}. What worked for SaaS founders in this space. JSON ${item}.`,
-    },
-    {
-      url: `https://hn.algolia.com/?query=${encodeURIComponent(`${q} startup launch`)}`,
-      source: "Hacker News",
-      bucket: pos,
-      goal: `Topic: ${str(q)}. Discussions where something went well or lessons from success. JSON ${item}.`,
-    },
-    {
       url: `https://www.reddit.com/r/startups/search/?q=${encodeURIComponent(`${q} failed mistake postmortem`)}&restrict_sr=1`,
       source: "r/startups (risks)",
       bucket: neg,
       goal: `Topic: ${str(q)}. Failures, regrets, post-mortems, shutdowns. JSON ${item}.`,
     },
     {
-      url: `https://www.reddit.com/r/SaaS/search/?q=${encodeURIComponent(`${q} churn mistake failed`)}&restrict_sr=1`,
-      source: "r/SaaS (risks)",
-      bucket: neg,
-      goal: `Topic: ${str(q)}. What went wrong for similar products. JSON ${item}.`,
-    },
-    {
-      url: `https://www.google.com/search?q=${encodeURIComponent(`${q} startup postmortem why we failed`)}`,
-      source: "Web (failure writeups)",
-      bucket: neg,
-      goal: `Topic: ${str(q)}. Articles on mistakes or shutdowns. JSON ${item}.`,
-    },
-    {
-      url: `https://www.google.com/search?q=${eq}+${encodeURIComponent("startup advice")}`,
-      source: "General web",
+      url: `https://www.google.com/search?q=${encodeURIComponent(`${q} startup founder advice`)}`,
+      source: "Web (context)",
       bucket: "context",
-      goal: `Topic: ${str(q)}. Neutral context: advice threads or summaries. JSON ${item}.`,
+      goal: `Topic: ${str(q)}. Short neutral summary of advice or discussion snippets. JSON ${item}.`,
     },
   ];
 }
@@ -110,11 +86,17 @@ The JSON array is live web research from TinyFish (each object may include sourc
 
 You MUST respond with exactly three sections using these bold titles on their own lines (nothing else as top-level ** sections):
 
-**Positive**
-Bullet points: evidence-backed reasons the founder's move or question could work, grounded in POSITIVE bucket data. Tie to their startup context when relevant.
+**Signals in your favour**
+Use this exact pattern for each finding (repeat for every bullet):
+- One-line headline (the main signal).
+  Next line(s): 1–2 sentences of supporting evidence from the POSITIVE bucket in the JSON (cite what people did or said).
+  Final line of that finding (required): Source: <short label> — use subreddit like r/startups, or hostname, or the scrape's source field; keep it brief.
 
-**Negative**
-Bullet points: concrete risks, failures, or counter-signals from NEGATIVE bucket data. Be specific.
+**Risks & warning signs**
+Same pattern as above for each risk:
+- One-line headline.
+  1–2 sentences from the NEGATIVE bucket.
+  Final line (required): Source: <short label> as above.
 
 **AI Verdict**
 2–4 sentences: balanced recommendation for THIS founder (use profile: name, description, stage, category). Say what you would do next and under what conditions to reconsider. Base the verdict primarily on the scraped JSON; if data is thin, say so briefly.

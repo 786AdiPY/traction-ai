@@ -23,10 +23,10 @@ public class OpenRouterLlmService {
 	private final ObjectMapper objectMapper;
 
 	public OpenRouterLlmService(
-			@Value("${OPENROUTER_API_KEY:}") String apiKey,
+			@Value("${openrouter.api.key:${OPENROUTER_API_KEY:}}") String apiKey,
 			@Value("${model:openai/gpt-4o-mini}") String model,
 			ObjectMapper objectMapper) {
-		this.apiKey = apiKey != null ? apiKey : "";
+		this.apiKey = apiKey != null ? apiKey.trim() : "";
 		this.model = model != null && !model.isBlank() ? model : "openai/gpt-4o-mini";
 		this.objectMapper = objectMapper;
 		this.client = RestClient.builder().baseUrl("https://openrouter.ai/api/v1").build();

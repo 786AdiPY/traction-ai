@@ -49,20 +49,45 @@ export async function createProfile(token, profile) {
   return r.json();
 }
 
+/** Persists intel run to {@code queries} (user + active profile FKs). */
+export async function saveIntelQuery(token, body) {
+  const r = await fetch(apiUrl("/api/queries"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(t || `Save failed (${r.status})`);
+  }
+  return r.json();
+}
+
 function runSseUrl() {
   return apiUrl("/v1/automation/run-sse");
 }
 
-export async function tfScrape(url, goal) {
+/** TinyFish runs real browsers; each job often takes 1–3+ minutes. */
+const SCRAPE_TIMEOUT_MS = Number(import.meta.env.VITE_SCRAPE_TIMEOUT_MS) || 200000;
+
+export async function tfScrape(url, goal, timeoutMs = SCRAPE_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const r = await fetch(runSseUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, goal, browser_profile: "stealth" }),
+      signal: ctrl.signal,
     });
     if (!r.ok) {
       if (r.status === 503)
-        return { _error: "Search unavailable. Configure tiny_fish on the server or check the TinyFish proxy." };
+        return { _error: "Search unavailable. Configure tinyfish.api.key on the server or check the TinyFish proxy." };
+      if (r.status === 504 || r.status === 502)
+        return { _error: `TinyFish proxy timed out or failed (${r.status}). Try fewer sources or increase tinyfish.http.read-timeout-seconds on the server.` };
       return { _error: `Search failed (${r.status}).` };
     }
     const txt = await r.text();
@@ -75,8 +100,11 @@ export async function tfScrape(url, goal) {
         /* skip */
       }
     }
-  } catch {
-    /* network */
+  } catch (e) {
+    if (e?.name === "AbortError")
+      return { _error: `TinyFish scrape timed out after ${Math.round(timeoutMs / 1000)}s. Try again or raise VITE_SCRAPE_TIMEOUT_MS.` };
+  } finally {
+    clearTimeout(t);
   }
   return null;
 }

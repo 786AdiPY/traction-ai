@@ -54,6 +54,7 @@ export default function App() {
 
   const mod = MODULES.find((m) => m.id === tab);
   const IntelView = INTEL_VIEWS[tab];
+  const isIntelTab = Boolean(IntelView);
 
   // --- Initialization ---
   useEffect(() => {
@@ -148,15 +149,38 @@ export default function App() {
     setLoading(false);
   }
 
+  async function persistIntelQuery(moduleId, queryText, scrapeBlob, analysisText, scrapeCount, startedAt, status) {
+    if (!token) {
+      console.error("Intel query not saved: not authenticated.");
+      return;
+    }
+    try {
+      await Api.saveIntelQuery(token, {
+        module: moduleId,
+        queryText,
+        scrapeResults: JSON.stringify(scrapeBlob?.length ? scrapeBlob : []),
+        analysisText: analysisText ?? "",
+        isFallback: status === "completed" && scrapeCount === 0,
+        scrapeCount,
+        durationMs: Math.round(performance.now() - startedAt),
+        status,
+      });
+    } catch (err) {
+      console.error("Could not save intel run to queries table:", err?.message || err);
+    }
+  }
+
   async function run() {
-    const q = query || profile?.description || "";
+    const q = query.trim();
     if (!q || !mod) return;
     setLoading(true);
     setAnalysis("");
     setRaw(null);
     setShowRaw(false);
+    const startedAt = performance.now();
+    let scrapeBlob = [];
     try {
-      setPhase("Scraping live web data (TinyFish)...");
+      setPhase("TinyFish: 3 browser runs (often 1–3 min each)…");
       const tasks = getTasks(mod.id, q);
       const { data, error } = await Api.runScrapes(tasks);
       setPhase("Synthesizing with OpenRouter...");
@@ -170,6 +194,7 @@ export default function App() {
       const opinionOpts = mod.id === "opinion" ? { maxTokens: 8192 } : { maxTokens: 4096 };
       let res;
       if (data.length > 0) {
+        scrapeBlob = data;
         setRaw(data);
         res = await Api.llmAnalyze(
           getSysPrompt(mod.id),
@@ -182,7 +207,8 @@ export default function App() {
         }
       } else {
         const note = error || "Live data unavailable.";
-        setRaw([{ note }]);
+        scrapeBlob = [{ note }];
+        setRaw(scrapeBlob);
         res = await Api.llmAnalyze(
           getSysPrompt(mod.id),
           `${founderCtx}\n\n${note}\n\nNo scrape payloads. Still produce the required sections; state that web research was missing.`,
@@ -193,9 +219,12 @@ export default function App() {
         }
       }
       setAnalysis(res || "No analysis returned.");
+      await persistIntelQuery(mod.id, q, scrapeBlob, res, data.length, startedAt, "completed");
       setHist((p) => ({ ...p, [mod.id]: [...(p[mod.id] || []), { q, t: new Date().toLocaleTimeString() }] }));
     } catch (e) {
-      setAnalysis("Error: " + (e.message || "Please try again."));
+      const err = "Error: " + (e.message || "Please try again.");
+      setAnalysis(err);
+      await persistIntelQuery(mod.id, q, scrapeBlob, err, scrapeBlob.length, startedAt, "failed");
     }
     setLoading(false);
     setPhase("");
@@ -204,6 +233,16 @@ export default function App() {
   useEffect(() => {
     if (analysis && ref.current) ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [analysis]);
+
+  /** Intel modules: no results until the user types a question and runs; clearing the box hides stale analysis. */
+  useEffect(() => {
+    if (!isIntelTab || loading) return;
+    if (!query.trim()) {
+      setAnalysis("");
+      setRaw(null);
+      setShowRaw(false);
+    }
+  }, [query, tab, loading, isIntelTab]);
 
   useEffect(() => {
     if (tab === "settings" && profile) {
@@ -320,6 +359,7 @@ export default function App() {
     query,
     setQuery,
     run,
+    runDisabled: !query.trim(),
     loading,
     phase,
     analysis,

@@ -8,6 +8,7 @@ export default function IntelModuleView({
   query,
   setQuery,
   run,
+  runDisabled,
   loading,
   phase,
   analysis,
@@ -49,8 +50,22 @@ export default function IntelModuleView({
         <>
           <div style={I.srchW}>
             <span style={{ color: "var(--t3)", fontSize: 14 }}>⌕</span>
-            <input style={I.srchI} placeholder={`Ask ${mod.name}...`} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !loading && run()} />
-            <button style={{ ...I.runB, background: mod.color, opacity: loading ? 0.6 : 1 }} disabled={loading} onClick={run}>
+            <input
+              style={I.srchI}
+              placeholder={`Ask ${mod.name}…`}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !loading && !runDisabled && run()}
+            />
+            <button
+              style={{
+                ...I.runB,
+                background: mod.color,
+                opacity: loading || runDisabled ? 0.45 : 1,
+              }}
+              disabled={loading || !!runDisabled}
+              onClick={run}
+            >
               {loading ? <span className="spin">⟳</span> : "→"}
             </button>
           </div>
