@@ -1,82 +1,76 @@
-Traction.ai
+# 🚀 Traction.ai
 
-Live Demo:https://traction-ai-gold.vercel.app/
-username:admin@zenohosp.com
-password:admin@123
+**Live Demo:** [traction-ai-gold.vercel.app](https://traction-ai-gold.vercel.app/)  
+**Test Credentials:**
+* **Username:** `admin@zenohosp.com`
+* **Password:** `admin@123`
 
+---
 
-Overview
-Traction.ai scrapes the live web using the TinyFish Web Agent API and delivers structured, actionable intelligence to startup founders — personalized to their company, stage, and market.
-Each query triggers parallel web scrapes across Reddit, Hacker News, Google, competitor websites, and job boards. The raw data is then analyzed by an LLM (via OpenRouter) to produce evidence-backed recommendations.
-Modules
-ModulePurposeOpinionAIStrategic advice grounded in real founder discussions from Reddit and HNCompeteMapLive competitive analysis — features, pricing, sentiment, and market gapsHireSignalHiring intelligence — role demand, salary benchmarks, competitor strategy signalsInvestorRadarActive investors in your space, funding trends, and fundraising readinessPriceLabCompetitor pricing data and community sentiment on value perceptionChurnSenseEarly warning signals from customer complaints and churn discussions
+## 📖 Overview
+Traction.ai scrapes the live web using the **TinyFish Web Agent API** to deliver structured, actionable intelligence to startup founders. Each query triggers parallel web scrapes across Reddit, Hacker News, Google, competitor websites, and job boards. The raw data is then analyzed via **OpenRouter (LLM)** to produce evidence-backed recommendations.
 
-Architecture
-                         ┌────────────────────┐
-                         │     React (UI)     │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │  Java Spring Boot  │
-                         │    (REST API)      │
-                         └───┬────────────┬───┘
-                             │            │
-                 ┌───────────▼──┐   ┌─────▼───────────┐
-                 │  TinyFish    │   │   OpenRouter     │
-                 │  Web Agent   │   │   (LLM API)     │
-                 │  API         │   │                  │
-                 └───────┬──────┘   └────────┬─────────┘
-                         │                   │
-          ┌──────────────▼──────────────┐    │
-          │  Live Web Sources           │    │
-          │  Reddit · HN · Google       │    │
-          │  Job boards · News          │    │
-          │  Competitor sites · Reviews │    │
-          └─────────────────────────────┘    │
-                         │                   │
-                         ▼                   ▼
-                 ┌─────────────────────────────┐
-                 │  Scraped data + AI analysis  │
-                 │  returned to user            │
-                 └──────────────┬───────────────┘
-                                │
-                                ▼
-                      ┌───────────────────┐
-                      │   PostgreSQL      │
-                      │   (Supabase)      │
-                      └───────────────────┘
+## 🛠 Modules
 
-Tech Stack
-LayerTechnologyFrontendReact, Tailwind CSSBackendJava, Spring BootWeb ScrapingTinyFish Web Agent APILLM AnalysisOpenRouter APIDatabasePostgreSQL (Supabase)AuthenticationSupabase AuthDeploymentVercel (frontend), Railway / Render (backend)
+| Module | Purpose |
+| :--- | :--- |
+| **OpinionAI** | Strategic advice grounded in real founder discussions from Reddit and HN. |
+| **CompeteMap** | Live competitive analysis covering features, pricing, and market gaps. |
+| **HireSignal** | Hiring intelligence including role demand and competitor strategy. |
+| **InvestorRadar** | Active investors in your space and fundraising readiness. |
+| **PriceLab** | Competitor pricing data and community value perception. |
+| **ChurnSense** | Early warning signals from customer complaints and churn discussions. |
 
+---
 
-Setup:
+## 🏗 Architecture
 
-Prerequisites
+```mermaid
+graph TD
+    A[React 18 UI] -->|REST API| B[Java 21 Spring Boot]
+    B --> C{Agent Orchestrator}
+    C -->|Web Scrape| D[TinyFish API]
+    C -->|Analysis| E[OpenRouter LLM]
+    D -->|Sources| F[Reddit / HN / Google / Job Boards]
+    E -->|Structured Data| G[(PostgreSQL Supabase)]
+    G -->|Results| A
+```
 
-Java 17+
-Node.js 18+
-PostgreSQL (or a Supabase project)
-API keys for TinyFish and OpenRouter
+## 💻 Tech Stack
+* **Frontend:** React 18, Tailwind CSS
+* **Backend:** Java 21, Spring Boot 3.x
+* **Web Scraping:** TinyFish Web Agent API
+* **LLM Analysis:** OpenRouter API 
+* **Database:** PostgreSQL (Supabase)
 
-Environment
-envTINYFISH_API_KEY=tf_your_key
-OPENROUTER_API_KEY=sk-or-your_key
-DATABASE_URL=postgresql://user:pass@host:5432/traction_ai
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your_anon_key
+---
 
+## ⚙️ Setup & Installation
 
-Backend
-bashcd backend
-./mvnw spring-boot:run
+### Prerequisites
+* **Java 21**
+* **Node.js 18+**
+* **PostgreSQL** (Supabase recommended)
 
+## Execution
+### Backend:
 
-Frontend
-bashcd frontend
+* Navigate to the backend directory.
+
+* Run the Maven wrapper to start the application.
+
+```Bash
+cd backend
+./mvnw clean spring-boot:run
+```
+* Frontend:
+
+* Navigate to the frontend directory.
+
+* Install dependencies and start the development server.
+
+```Bash
+cd frontend
 npm install
 npm run dev
-
-Access
-Open http://localhost:5173. Sign in
+```
