@@ -31,10 +31,11 @@ ENV JWT_EXPIRATION=86400
 
 # ── Environment variables ↔ application.properties (Spring Boot relaxed binding) ──
 #
-# Database (same names as ${DB_URL:...} / ${DB_USER:...} / ${DB_PASS:...} in properties):
-#   DB_URL          -> spring.datasource.url
-#   DB_USER         -> spring.datasource.username
-#   DB_PASS         -> spring.datasource.password
+# Database (same names as in application.properties):
+#   DB_URL                  -> spring.datasource.url
+#   DB_USER                 -> spring.datasource.username
+#   DB_PASS                 -> spring.datasource.password
+#   DB_DRIVER_CLASS_NAME    -> spring.datasource.driver-class-name (default: org.postgresql.Driver)
 #
 # OpenRouter LLM:
 #   OPENROUTER_API_KEY   -> openrouter.api.key   (also accepts OPENROUTER_API_KEY in @Value)
