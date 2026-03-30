@@ -6,6 +6,8 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -21,6 +23,20 @@ public class JwtService {
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
+
+    @PostConstruct
+    void validateSecret() {
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "jwt.secret is empty: set JWT_SECRET (env) or jwt.secret; min 32 chars for HS256.");
+        }
+        if (secretKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException(
+                    "JWT secret too short for HS256: need >= 32 bytes, got "
+                            + secretKey.getBytes(StandardCharsets.UTF_8).length
+                            + ". Set a longer JWT_SECRET.");
+        }
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);

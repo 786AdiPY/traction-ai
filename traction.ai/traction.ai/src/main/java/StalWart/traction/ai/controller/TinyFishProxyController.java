@@ -27,7 +27,7 @@ public class TinyFishProxyController {
 	private final String apiKey;
 
 	public TinyFishProxyController(
-			@Value("${tinyfish.api.key:${tiny_fish:}}") String apiKey,
+			@Value("${tinyfish.api.key:${TINYFISH_API_KEY:${tiny_fish:}}}") String apiKey,
 			@Value("${tinyfish.http.connect-timeout-seconds:45}") int connectTimeoutSeconds,
 			@Value("${tinyfish.http.read-timeout-seconds:180}") int readTimeoutSeconds) {
 		this.apiKey = apiKey != null ? apiKey : "";
