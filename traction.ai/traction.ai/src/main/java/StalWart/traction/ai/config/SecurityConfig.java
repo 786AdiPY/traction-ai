@@ -47,10 +47,17 @@ public class SecurityConfig {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration c = new CorsConfiguration();
-		c.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+		// Local dev + production frontend (https://traction-ai-gold.vercel.app/) + other Vercel preview URLs
+		c.setAllowedOriginPatterns(List.of(
+				"http://localhost:*",
+				"http://127.0.0.1:*",
+				"https://traction-ai-gold.vercel.app",
+				"https://*.vercel.app"));
 		c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
 		c.setAllowedHeaders(List.of("*"));
+		c.setExposedHeaders(List.of("Authorization"));
 		c.setAllowCredentials(true);
+		c.setMaxAge(3600L);
 		UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
 		s.registerCorsConfiguration("/**", c);
 		return s;
