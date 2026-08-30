@@ -18,7 +18,6 @@ Traction.ai scrapes the live web using the **TinyFish Web Agent API** to deliver
 | **CompeteMap** | Live competitive analysis covering features, pricing, and market gaps. |
 | **HireSignal** | Hiring intelligence including role demand and competitor strategy. |
 | **InvestorRadar** | Active investors in your space and fundraising readiness. |
-| **PriceLab** | Competitor pricing data and community value perception. |
 | **ChurnSense** | Early warning signals from customer complaints and churn discussions. |
 
 ---
